@@ -1,9 +1,89 @@
 # app.py
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, flash  # Modified import
+from flask_sqlalchemy import SQLAlchemy  # Added
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user  # Added
+from werkzeug.security import generate_password_hash, check_password_hash  # Added
 import requests
 import base64
+import os
 
 app = Flask(__name__)
+
+# Login Configuration
+app.config['SECRET_KEY'] = 'thisisasecretkey1'  # Change this!
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+db = SQLAlchemy(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
+# User Model 
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), unique=True)
+    password_hash = db.Column(db.String(100))
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+    
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('index'))
+        
+        flash('Invalid username or password')
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists')
+            return redirect(url_for('register'))
+        
+        new_user = User(username=username)
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
+        
+        flash('Registration successful! Please login.')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/', methods=['GET', 'POST'])
+@login_required
+def index():
+    if request.method == 'POST':
+        compound_name = request.form['compound']
+        data, error = get_compound_data(compound_name)
+        return render_template('index.html', data=data, error=error)
+    return render_template('index.html', data=None, error=None)
+
+# Login Manager Loader
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 def get_compound_data(compound_name):
     base_url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name"
@@ -53,13 +133,11 @@ def get_compound_data(compound_name):
     except Exception as e:
         return None, str(e)
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        compound_name = request.form['compound']
-        data, error = get_compound_data(compound_name)
-        return render_template('index.html', data=data, error=error)
-    return render_template('index.html', data=None, error=None)
 
+
+
+with app.app_context():
+    db.create_all() 
+    
 if __name__ == '__main__':
     app.run(debug=True)
