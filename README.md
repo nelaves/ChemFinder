@@ -8,7 +8,7 @@ ChemFinder is a web-based chemical structure search and database management tool
 # Demo
 ![image](https://github.com/user-attachments/assets/cd72b80d-fd4b-4154-ad25-61379b725823)
 
-#**Roadmap**
+# Roadmap
 ![Untitled Diagram](https://github.com/user-attachments/assets/8a42a42f-02b5-45ce-9752-21ed071a0b69)
 
 # Architecture
