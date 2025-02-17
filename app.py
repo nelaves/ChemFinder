@@ -1,8 +1,7 @@
-# app.py
-from flask import Flask, render_template, request, redirect, url_for, flash  # Modified import
-from flask_sqlalchemy import SQLAlchemy  # Added
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user  # Added
-from werkzeug.security import generate_password_hash, check_password_hash  # Added
+from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 import requests
 import base64
 import os
@@ -20,6 +19,7 @@ login_manager.login_view = 'login'
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True)
+    email = db.Column(db.String(100), unique=True)  # Added email column
     password_hash = db.Column(db.String(100))
 
     def set_password(self, password):
@@ -41,21 +41,26 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('index'))
-        
-        flash('Invalid username or password')
+        else:      
+            flash('Invalid username or password')
     return render_template('login.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
+        email = request.form['email']  # Added email field
         password = request.form['password']
         
         if User.query.filter_by(username=username).first():
             flash('Username already exists')
             return redirect(url_for('register'))
         
-        new_user = User(username=username)
+        if User.query.filter_by(email=email).first():  # Check if email already exists
+            flash('Email already exists')
+            return redirect(url_for('register'))
+        
+        new_user = User(username=username, email=email)  # Added email
         new_user.set_password(password)
         db.session.add(new_user)
         db.session.commit()
@@ -132,9 +137,6 @@ def get_compound_data(compound_name):
     
     except Exception as e:
         return None, str(e)
-
-
-
 
 with app.app_context():
     db.create_all() 
